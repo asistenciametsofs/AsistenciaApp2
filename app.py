@@ -1,8 +1,13 @@
 import streamlit as st
 import pandas as pd
 import smtplib
+import tempfile
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 # -----------------------------
 # Leer CSV SIN encabezado
@@ -37,7 +42,7 @@ supervisor = st.selectbox(
 st.markdown("### Lista de asistencia")
 
 # -----------------------------
-# Lista asistencia (SIN encabezados)
+# Lista asistencia
 # -----------------------------
 asistencia = []
 
@@ -68,31 +73,93 @@ for i, nombre in enumerate(personal):
     })
 
 # -----------------------------
-# Enviar correo
+# Enviar correo + PDF
 # -----------------------------
 if st.button("Enviar asistencia"):
 
-    texto = f"Asistencia\nFecha: {fecha}\nSupervisor: {supervisor}\n\n"
+    # -----------------------------
+    # Crear PDF
+    # -----------------------------
+    pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
 
-    texto += "ASISTIERON:\n"
+    c = canvas.Canvas(pdf_temp.name, pagesize=A4)
+    width, height = A4
+    y = height - 40
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(40, y, "Registro de Asistencia")
+    y -= 25
+
+    c.setFont("Helvetica", 11)
+    c.drawString(40, y, f"Fecha: {fecha}")
+    y -= 15
+    c.drawString(40, y, f"Supervisor: {supervisor}")
+    y -= 30
+
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "ASISTIERON")
+    y -= 15
+
+    c.setFont("Helvetica", 10)
     for item in asistencia:
         if item["Asistió"]:
-            texto += f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}\n"
+            texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}"
+            c.drawString(50, y, texto)
+            y -= 14
+            if y < 50:
+                c.showPage()
+                y = height - 40
 
-    texto += "\nNO ASISTIERON:\n"
+    y -= 20
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(40, y, "NO ASISTIERON")
+    y -= 15
+
+    c.setFont("Helvetica", 10)
     for item in asistencia:
         if not item["Asistió"]:
-            texto += f"- {item['Nombre']}\n"
+            c.drawString(50, y, f"- {item['Nombre']}")
+            y -= 14
+            if y < 50:
+                c.showPage()
+                y = height - 40
 
+    c.save()
+
+    # -----------------------------
+    # Correo
+    # -----------------------------
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
-    destinatario = st.secrets["destino"]
+    destinatarios = st.secrets["destino"]  # VARIOS correos
 
     msg = MIMEMultipart()
     msg["From"] = remitente
-    msg["To"] = destinatario
+    msg["To"] = destinatarios
     msg["Subject"] = f"Asistencia {fecha} - {supervisor}"
-    msg.attach(MIMEText(texto, "plain"))
+
+    cuerpo = f"""
+Registro de asistencia
+
+Fecha: {fecha}
+Supervisor: {supervisor}
+
+Se adjunta el archivo PDF con el detalle.
+"""
+    msg.attach(MIMEText(cuerpo, "plain"))
+
+    # Adjuntar PDF
+    with open(pdf_temp.name, "rb") as f:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(f.read())
+
+    encoders.encode_base64(part)
+    part.add_header(
+        "Content-Disposition",
+        f'attachment; filename="Asistencia_{fecha}.pdf"'
+    )
+
+    msg.attach(part)
 
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -100,6 +167,6 @@ if st.button("Enviar asistencia"):
         server.login(remitente, contraseña)
         server.send_message(msg)
         server.quit()
-        st.success("✅ Correo enviado correctamente")
+        st.success("✅ Asistencia enviada con PDF adjunto")
     except Exception as e:
         st.error(f"❌ Error al enviar correo: {e}")
