@@ -24,9 +24,9 @@ personal = personal[personal.str.lower() != "nombre"]
 # -----------------------------
 # Configuración página
 # -----------------------------
-st.set_page_config(page_title="Registro de Asistencia", layout="wide")
+st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
 
-st.title("Registro de Asistencia")
+st.title("REGISTRO DE ALCOHOTEST")
 
 fecha = st.date_input("Fecha")
 
@@ -39,7 +39,7 @@ supervisor = st.selectbox(
     ]
 )
 
-st.markdown("### Lista de asistencia")
+st.markdown("### Lista de personal")
 
 # -----------------------------
 # Lista asistencia
@@ -75,7 +75,7 @@ for i, nombre in enumerate(personal):
 # -----------------------------
 # Enviar correo + PDF
 # -----------------------------
-if st.button("Enviar asistencia"):
+if st.button("Enviar registro de alcohotest"):
 
     # -----------------------------
     # Crear PDF
@@ -87,7 +87,7 @@ if st.button("Enviar asistencia"):
     y = height - 40
 
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, y, "Registro de Asistencia")
+    c.drawString(40, y, "REGISTRO DE ALCOHOTEST")
     y -= 25
 
     c.setFont("Helvetica", 11)
@@ -131,20 +131,22 @@ if st.button("Enviar asistencia"):
     # -----------------------------
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
-    destinatarios = st.secrets["destino"]  # VARIOS correos
+
+    # VARIOS destinatarios desde secrets (separados por coma)
+    destinatarios = [d.strip() for d in st.secrets["destino"].split(",")]
 
     msg = MIMEMultipart()
     msg["From"] = remitente
-    msg["To"] = destinatarios
-    msg["Subject"] = f"Asistencia {fecha} - {supervisor}"
+    msg["To"] = ", ".join(destinatarios)
+    msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
 
     cuerpo = f"""
-Registro de asistencia
+REGISTRO DE ALCOHOTEST
 
 Fecha: {fecha}
 Supervisor: {supervisor}
 
-Se adjunta el archivo PDF con el detalle.
+Se adjunta el archivo PDF con el detalle del registro.
 """
     msg.attach(MIMEText(cuerpo, "plain"))
 
@@ -156,7 +158,7 @@ Se adjunta el archivo PDF con el detalle.
     encoders.encode_base64(part)
     part.add_header(
         "Content-Disposition",
-        f'attachment; filename="Asistencia_{fecha}.pdf"'
+        f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"'
     )
 
     msg.attach(part)
@@ -165,8 +167,8 @@ Se adjunta el archivo PDF con el detalle.
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(remitente, contraseña)
-        server.send_message(msg)
+        server.sendmail(remitente, destinatarios, msg.as_string())
         server.quit()
-        st.success("✅ Asistencia enviada con PDF adjunto")
+        st.success("✅ Registro de alcohotest enviado con PDF adjunto")
     except Exception as e:
         st.error(f"❌ Error al enviar correo: {e}")
