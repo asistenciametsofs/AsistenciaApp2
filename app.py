@@ -5,17 +5,17 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # -----------------------------
-# Leer CSV (1 sola columna: Nombre)
+# Leer CSV (corrige ï»¿Nombre)
 # -----------------------------
 personal = pd.read_csv(
     "personal.csv",
-    encoding="latin1",
+    encoding="utf-8-sig",   # <-- CLAVE
     header=None,
     names=["Nombre"]
 ).dropna()
 
 # -----------------------------
-# UI
+# Configuración página
 # -----------------------------
 st.set_page_config(page_title="Registro de Asistencia", layout="wide")
 
@@ -35,16 +35,14 @@ supervisor = st.selectbox(
 st.markdown("### Lista de asistencia")
 
 # -----------------------------
-# Tabla de asistencia
+# Encabezados
 # -----------------------------
-asistencia = []
+h1, h2, h3, h4 = st.columns([0.7, 4, 2, 3])
 
-# Encabezados tipo planilla
-h1, h2, h3, h4 = st.columns([4, 1, 2, 3])
 with h1:
-    st.markdown("**Nombre**")
-with h2:
     st.markdown("**✔**")
+with h2:
+    st.markdown("**Nombre**")
 with h3:
     st.markdown("**Estado**")
 with h4:
@@ -52,14 +50,19 @@ with h4:
 
 st.divider()
 
+# -----------------------------
+# Tabla asistencia
+# -----------------------------
+asistencia = []
+
 for i, row in personal.iterrows():
-    col1, col2, col3, col4 = st.columns([4, 1, 2, 3])
+    col1, col2, col3, col4 = st.columns([0.7, 4, 2, 3])
 
     with col1:
-        st.write(row["Nombre"])
+        asistio = st.checkbox("", key=f"chk_{i}")
 
     with col2:
-        asistio = st.checkbox("", key=f"chk_{i}")
+        st.write(row["Nombre"])
 
     with col3:
         estado = st.selectbox(
@@ -69,10 +72,7 @@ for i, row in personal.iterrows():
         )
 
     with col4:
-        comentario = st.text_input(
-            "",
-            key=f"obs_{i}"
-        )
+        comentario = st.text_input("", key=f"obs_{i}")
 
     asistencia.append({
         "Nombre": row["Nombre"],
@@ -117,5 +117,3 @@ if st.button("Enviar asistencia"):
         st.success("✅ Correo enviado correctamente")
     except Exception as e:
         st.error(f"❌ Error al enviar correo: {e}")
-
-
