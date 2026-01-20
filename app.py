@@ -8,9 +8,20 @@ from email.mime.base import MIMEBase
 from email import encoders
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.lib import colors
 
 # -----------------------------
-# Leer CSV SIN encabezado
+# CONFIGURACIÓN GENERAL
+# -----------------------------
+st.set_page_config(
+    page_title="REGISTRO DE ALCOHOTEST",
+    layout="wide"
+)
+
+st.title("🧪 REGISTRO DE ALCOHOTEST")
+
+# -----------------------------
+# LEER PERSONAL
 # -----------------------------
 personal = pd.read_csv(
     "personal.csv",
@@ -22,16 +33,12 @@ personal = personal.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"]
 
 # -----------------------------
-# Configuración página
+# DATOS GENERALES
 # -----------------------------
-st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
-
-st.title("REGISTRO DE ALCOHOTEST")
-
-fecha = st.date_input("Fecha")
+fecha = st.date_input("📅 Fecha")
 
 supervisor = st.selectbox(
-    "Supervisor",
+    "👷 Supervisor",
     [
         "Marco Sanz", "Daniel Herreros", "Daniel Aedo", "Freddy Marquez",
         "Joey Abarca", "Wilmer Mixcan", "Lizeth Gonzales", "Victor Velasquez",
@@ -39,46 +46,52 @@ supervisor = st.selectbox(
     ]
 )
 
-st.markdown("### Lista de personal")
+st.markdown("### 👥 Lista de personal")
 
 # -----------------------------
-# Lista asistencia
+# LISTA DE ASISTENCIA (MOBILE)
 # -----------------------------
 asistencia = []
 
 for i, nombre in enumerate(personal):
-    col1, col2, col3, col4 = st.columns([0.7, 4, 2, 3])
+    with st.container(border=True):
+        col1, col2 = st.columns([1, 6])
 
-    with col1:
-        asistio = st.checkbox("", key=f"chk_{i}")
+        with col1:
+            asistio = st.checkbox("✔️", key=f"chk_{i}")
 
-    with col2:
-        st.write(nombre)
+        with col2:
+            st.markdown(f"**{nombre}**")
 
-    with col3:
-        estado = st.selectbox(
-            "",
+        estado = st.radio(
+            "Estado",
             ["Sin observación", "Observado"],
+            horizontal=True,
             key=f"estado_{i}"
         )
 
-    with col4:
-        comentario = st.text_input("", key=f"obs_{i}")
+        comentario = ""
+        if estado == "Observado":
+            comentario = st.text_input(
+                "Observación",
+                placeholder="Ej: Aliento etílico / 0.15",
+                key=f"obs_{i}"
+            )
 
-    asistencia.append({
-        "Nombre": nombre,
-        "Asistió": asistio,
-        "Estado": estado,
-        "Comentario": comentario
-    })
+        asistencia.append({
+            "Nombre": nombre,
+            "Asistió": asistio,
+            "Estado": estado,
+            "Comentario": comentario
+        })
 
 # -----------------------------
-# Enviar correo + PDF
+# BOTÓN ENVIAR
 # -----------------------------
-if st.button("Enviar registro de alcohotest"):
+if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
     # -----------------------------
-    # Crear PDF
+    # CREAR PDF
     # -----------------------------
     pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
 
@@ -100,39 +113,44 @@ if st.button("Enviar registro de alcohotest"):
     c.drawString(40, y, "ASISTIERON")
     y -= 15
 
-    c.setFont("Helvetica", 10)
     for item in asistencia:
         if item["Asistió"]:
+            # Color según estado
+            if item["Estado"] == "Observado":
+                c.setFillColor(colors.red)
+            else:
+                c.setFillColor(colors.green)
+
             texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}"
             c.drawString(50, y, texto)
             y -= 14
-            if y < 50:
+            if y < 60:
                 c.showPage()
                 y = height - 40
 
     y -= 20
     c.setFont("Helvetica-Bold", 11)
+    c.setFillColor(colors.black)
     c.drawString(40, y, "NO ASISTIERON")
     y -= 15
 
     c.setFont("Helvetica", 10)
     for item in asistencia:
         if not item["Asistió"]:
+            c.setFillColor(colors.black)
             c.drawString(50, y, f"- {item['Nombre']}")
             y -= 14
-            if y < 50:
+            if y < 60:
                 c.showPage()
                 y = height - 40
 
     c.save()
 
     # -----------------------------
-    # Correo
+    # ENVÍO CORREO
     # -----------------------------
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
-
-    # VARIOS destinatarios desde secrets (separados por coma)
     destinatarios = [d.strip() for d in st.secrets["destino"].split(",")]
 
     msg = MIMEMultipart()
@@ -146,11 +164,10 @@ REGISTRO DE ALCOHOTEST
 Fecha: {fecha}
 Supervisor: {supervisor}
 
-Se adjunta el archivo PDF con el detalle del registro.
+Se adjunta el archivo PDF con el registro.
 """
     msg.attach(MIMEText(cuerpo, "plain"))
 
-    # Adjuntar PDF
     with open(pdf_temp.name, "rb") as f:
         part = MIMEBase("application", "octet-stream")
         part.set_payload(f.read())
@@ -163,12 +180,11 @@ Se adjunta el archivo PDF con el detalle del registro.
 
     msg.attach(part)
 
-    try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(remitente, contraseña)
-        server.sendmail(remitente, destinatarios, msg.as_string())
-        server.quit()
-        st.success("✅ Registro de alcohotest enviado con PDF adjunto")
-    except Exception as e:
-        st.error(f"❌ Error al enviar correo: {e}")
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
+    server.login(remitente, contraseña)
+    server.sendmail(remitente, destinatarios, msg.as_string())
+    server.quit()
+
+    st.success("✅ Registro enviado correctamente")
+
