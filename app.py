@@ -4,49 +4,100 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# --- Leer CSV ---
-# Para tu CSV con encabezado “Nombre” o solo una columna
-personal = pd.read_csv("personal.csv", encoding="latin1", header=None, names=["Nombre"]).dropna()
+# -----------------------------
+# Leer CSV (1 sola columna: Nombre)
+# -----------------------------
+personal = pd.read_csv(
+    "personal.csv",
+    encoding="latin1",
+    header=None,
+    names=["Nombre"]
+).dropna()
 
-# --- App UI ---
+# -----------------------------
+# UI
+# -----------------------------
+st.set_page_config(page_title="Registro de Asistencia", layout="wide")
+
 st.title("Registro de Asistencia")
 
-# Fecha y supervisor
 fecha = st.date_input("Fecha")
-supervisor = st.text_input("Supervisor")
 
-st.write("Marca la asistencia y completa observaciones:")
+supervisor = st.selectbox(
+    "Supervisor",
+    [
+        "Marco Sanz", "Daniel Herreros", "Daniel Aedo", "Freddy Marquez",
+        "Joey Abarca", "Wilmer Mixcan", "Lizeth Gonzales", "Victor Velasquez",
+        "Jaime Vizcarra", "Juan Cojoma", "Diego Carpio", "Raul Cardenas"
+    ]
+)
 
-# Diccionario para guardar asistencia
-asistencia = {}
+st.markdown("### Lista de asistencia")
 
-# Para cada persona
+# -----------------------------
+# Tabla de asistencia
+# -----------------------------
+asistencia = []
+
+# Encabezados tipo planilla
+h1, h2, h3, h4 = st.columns([4, 1, 2, 3])
+with h1:
+    st.markdown("**Nombre**")
+with h2:
+    st.markdown("**✔**")
+with h3:
+    st.markdown("**Estado**")
+with h4:
+    st.markdown("**Observación**")
+
+st.divider()
+
 for i, row in personal.iterrows():
-    nombre = row["Nombre"]
-    col1, col2, col3 = st.columns([2,1,3])
-    with col1:
-        checked = st.checkbox(nombre, key=i)
-    with col2:
-        estado = st.selectbox("Estado", ["Sin observación","Observado"], key=f"estado{i}")
-    with col3:
-        comentario = st.text_input("Observación", key=f"obs{i}")
-    asistencia[nombre] = {"Asistió": checked, "Estado": estado, "Comentario": comentario}
+    col1, col2, col3, col4 = st.columns([4, 1, 2, 3])
 
-# Botón enviar
+    with col1:
+        st.write(row["Nombre"])
+
+    with col2:
+        asistio = st.checkbox("", key=f"chk_{i}")
+
+    with col3:
+        estado = st.selectbox(
+            "",
+            ["Sin observación", "Observado"],
+            key=f"estado_{i}"
+        )
+
+    with col4:
+        comentario = st.text_input(
+            "",
+            key=f"obs_{i}"
+        )
+
+    asistencia.append({
+        "Nombre": row["Nombre"],
+        "Asistió": asistio,
+        "Estado": estado,
+        "Comentario": comentario
+    })
+
+# -----------------------------
+# Enviar correo
+# -----------------------------
 if st.button("Enviar asistencia"):
 
-    # Crear texto del correo
-    texto = f"Asistencia - Fecha: {fecha}, Supervisor: {supervisor}\n\n"
-    texto += "ASISTIERON:\n"
-    for nombre, info in asistencia.items():
-        if info["Asistió"]:
-            texto += f"- {nombre} | {info['Estado']} | {info['Comentario']}\n"
-    texto += "\nNO ASISTIERON:\n"
-    for nombre, info in asistencia.items():
-        if not info["Asistió"]:
-            texto += f"- {nombre}\n"
+    texto = f"Asistencia\nFecha: {fecha}\nSupervisor: {supervisor}\n\n"
 
-    # --- Enviar correo ---
+    texto += "ASISTIERON:\n"
+    for item in asistencia:
+        if item["Asistió"]:
+            texto += f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}\n"
+
+    texto += "\nNO ASISTIERON:\n"
+    for item in asistencia:
+        if not item["Asistió"]:
+            texto += f"- {item['Nombre']}\n"
+
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
     destinatario = st.secrets["destino"]
@@ -63,6 +114,8 @@ if st.button("Enviar asistencia"):
         server.login(remitente, contraseña)
         server.send_message(msg)
         server.quit()
-        st.success("Correo enviado correctamente!")
+        st.success("✅ Correo enviado correctamente")
     except Exception as e:
-        st.error(f"Error al enviar correo: {e}")
+        st.error(f"❌ Error al enviar correo: {e}")
+
+
