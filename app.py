@@ -30,16 +30,13 @@ personal = pd.read_csv(
 )
 
 personal = personal.iloc[:, 0].astype(str)
-personal = personal[personal.str.lower() != "nombre"]
+personal = personal[personal.str.lower() != "nombre"].tolist()
 
 # -----------------------------
-# SESSION STATE BUSCADOR
+# SESSION STATE
 # -----------------------------
-if "filtro" not in st.session_state:
-    st.session_state.filtro = ""
-
-def refrescar_busqueda():
-    st.session_state.filtro = st.session_state.busqueda
+if "seleccionados" not in st.session_state:
+    st.session_state.seleccionados = []
 
 # -----------------------------
 # DATOS GENERALES
@@ -58,64 +55,61 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR AUTOMÁTICO (SIN ENTER)
+# BUSCADOR REAL (AUTOFILTRO)
 # -----------------------------
-st.text_input(
-    "🔍 Buscar trabajador",
-    placeholder="Escribe apellido o nombre",
-    key="busqueda",
-    on_change=refrescar_busqueda
+st.subheader("🔍 Buscar y agregar trabajador")
+
+seleccion = st.multiselect(
+    "Escribe apellido o nombre",
+    options=personal,
+    placeholder="Buscar...",
+    label_visibility="collapsed"
 )
 
-busqueda = st.session_state.filtro.strip()
+col1, col2 = st.columns([1, 1])
+with col2:
+    if st.button("🧹 Limpiar búsqueda"):
+        st.session_state.seleccionados = []
+        st.rerun()
 
-if busqueda:
-    personal_filtrado = personal[
-        personal.str.lower().str.contains(busqueda.lower())
-    ]
-else:
-    personal_filtrado = personal
+for nombre in seleccion:
+    if nombre not in [x["Nombre"] for x in st.session_state.seleccionados]:
+        st.session_state.seleccionados.append({
+            "Nombre": nombre,
+            "Asistió": True,
+            "Estado": "Sin observación",
+            "Comentario": ""
+        })
 
-st.markdown("### 👥 Lista de personal")
+st.divider()
 
 # -----------------------------
-# LISTA DE PERSONAL
+# LISTA SELECCIONADA
 # -----------------------------
-asistencia = []
+st.subheader("👥 Personal evaluado")
 
-for idx in personal_filtrado.index:
-    nombre = personal.loc[idx]
-
+for i, item in enumerate(st.session_state.seleccionados):
     with st.container(border=True):
-        col1, col2 = st.columns([1, 6])
 
-        with col1:
-            asistio = st.checkbox("", key=f"chk_{idx}")
-
-        with col2:
-            st.markdown(f"**{nombre}**")
+        st.markdown(f"**{item['Nombre']}**")
 
         estado = st.radio(
             "Estado",
             ["Sin observación", "Observado"],
             horizontal=True,
-            key=f"estado_{idx}"
+            key=f"estado_{i}"
         )
 
-        comentario = ""
+        item["Estado"] = estado
+
         if estado == "Observado":
-            comentario = st.text_input(
+            item["Comentario"] = st.text_input(
                 "Observación",
                 placeholder="Ej: Aliento etílico / 0.15",
-                key=f"obs_{idx}"
+                key=f"obs_{i}"
             )
-
-        asistencia.append({
-            "Nombre": nombre,
-            "Asistió": asistio,
-            "Estado": estado,
-            "Comentario": comentario
-        })
+        else:
+            item["Comentario"] = ""
 
 # -----------------------------
 # BOTÓN ENVIAR
@@ -138,20 +132,19 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     c.drawString(40, y, f"Supervisor: {supervisor}")
     y -= 30
 
-    for item in asistencia:
-        if item["Asistió"]:
-            if item["Estado"] == "Observado":
-                c.setFillColor(colors.red)
-            else:
-                c.setFillColor(colors.green)
+    for item in st.session_state.seleccionados:
+        if item["Estado"] == "Observado":
+            c.setFillColor(colors.red)
+        else:
+            c.setFillColor(colors.green)
 
-            texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}"
-            c.drawString(40, y, texto)
-            y -= 14
+        texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}"
+        c.drawString(40, y, texto)
+        y -= 14
 
-            if y < 60:
-                c.showPage()
-                y = height - 40
+        if y < 60:
+            c.showPage()
+            y = height - 40
 
     c.save()
 
@@ -193,6 +186,3 @@ Se adjunta el archivo PDF con el registro.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
-
-
-
