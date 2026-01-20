@@ -30,13 +30,7 @@ personal = pd.read_csv(
 )
 
 personal = personal.iloc[:, 0].astype(str)
-personal = personal[personal.str.lower() != "nombre"].tolist()
-
-# -----------------------------
-# SESSION STATE
-# -----------------------------
-if "seleccionados" not in st.session_state:
-    st.session_state.seleccionados = []
+personal = personal[personal.str.lower() != "nombre"]
 
 # -----------------------------
 # DATOS GENERALES
@@ -55,68 +49,67 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR DIDÁCTICO
+# BUSCADOR (SOLO FILTRA)
 # -----------------------------
-st.subheader("🔍 Buscar trabajador")
-
 busqueda = st.text_input(
-    "",
+    "🔍 Buscar trabajador",
     placeholder="Escribe apellido o nombre"
 )
 
 if busqueda:
-    resultados = [
-        p for p in personal
-        if busqueda.lower() in p.lower()
-        and p not in [x["Nombre"] for x in st.session_state.seleccionados]
+    personal_filtrado = personal[
+        personal.str.lower().str.contains(busqueda.lower())
     ]
+else:
+    personal_filtrado = personal
 
-    for nombre in resultados:
-        if st.button(f"➕ {nombre}", key=f"add_{nombre}"):
-            st.session_state.seleccionados.append({
-                "Nombre": nombre,
-                "Asistió": True,
-                "Estado": "Sin observación",
-                "Comentario": ""
-            })
-            st.rerun()
-
-st.divider()
+st.markdown("### 👥 Lista de personal")
 
 # -----------------------------
-# LISTA SELECCIONADA (MOBILE)
+# LISTA COMPLETA (MOBILE)
 # -----------------------------
-st.subheader("👥 Personal evaluado")
+asistencia = []
 
-for i, item in enumerate(st.session_state.seleccionados):
+for idx in personal_filtrado.index:
+    nombre = personal.loc[idx]
+
     with st.container(border=True):
+        col1, col2 = st.columns([1, 6])
 
-        st.markdown(f"**{item['Nombre']}**")
+        with col1:
+            asistio = st.checkbox("✔️", key=f"chk_{idx}")
+
+        with col2:
+            st.markdown(f"**{nombre}**")
 
         estado = st.radio(
             "Estado",
             ["Sin observación", "Observado"],
             horizontal=True,
-            key=f"estado_{i}"
+            key=f"estado_{idx}"
         )
 
-        item["Estado"] = estado
-
+        comentario = ""
         if estado == "Observado":
-            item["Comentario"] = st.text_input(
+            comentario = st.text_input(
                 "Observación",
                 placeholder="Ej: Aliento etílico / 0.15",
-                key=f"obs_{i}"
+                key=f"obs_{idx}"
             )
-        else:
-            item["Comentario"] = ""
+
+        asistencia.append({
+            "Nombre": nombre,
+            "Asistió": asistio,
+            "Estado": estado,
+            "Comentario": comentario
+        })
 
 # -----------------------------
 # BOTÓN ENVIAR
 # -----------------------------
 if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
-    # ---------------- PDF ----------------
+    # -------- PDF --------
     pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(pdf_temp.name, pagesize=A4)
     width, height = A4
@@ -132,23 +125,24 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     c.drawString(40, y, f"Supervisor: {supervisor}")
     y -= 30
 
-    for item in st.session_state.seleccionados:
-        if item["Estado"] == "Observado":
-            c.setFillColor(colors.red)
-        else:
-            c.setFillColor(colors.green)
+    for item in asistencia:
+        if item["Asistió"]:
+            if item["Estado"] == "Observado":
+                c.setFillColor(colors.red)
+            else:
+                c.setFillColor(colors.green)
 
-        texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}"
-        c.drawString(40, y, texto)
-        y -= 14
+            texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}"
+            c.drawString(40, y, texto)
+            y -= 14
 
-        if y < 60:
-            c.showPage()
-            y = height - 40
+            if y < 60:
+                c.showPage()
+                y = height - 40
 
     c.save()
 
-    # ---------------- MAIL ----------------
+    # -------- MAIL --------
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
     destinatarios = [d.strip() for d in st.secrets["destino"].split(",")]
@@ -158,8 +152,7 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     msg["To"] = ", ".join(destinatarios)
     msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
 
-    cuerpo = f"""
-REGISTRO DE ALCOHOTEST
+    cuerpo = f"""REGISTRO DE ALCOHOTEST
 
 Fecha: {fecha}
 Supervisor: {supervisor}
@@ -187,4 +180,5 @@ Se adjunta el archivo PDF con el registro.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
+
 
