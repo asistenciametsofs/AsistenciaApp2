@@ -33,10 +33,13 @@ personal = personal.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"]
 
 # -----------------------------
-# SESSION STATE
+# SESSION STATE BUSCADOR
 # -----------------------------
-if "busqueda" not in st.session_state:
-    st.session_state.busqueda = ""
+if "filtro" not in st.session_state:
+    st.session_state.filtro = ""
+
+def refrescar_busqueda():
+    st.session_state.filtro = st.session_state.busqueda
 
 # -----------------------------
 # DATOS GENERALES
@@ -55,16 +58,16 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR (FILTRA EN VIVO)
+# BUSCADOR AUTOMÁTICO (SIN ENTER)
 # -----------------------------
 st.text_input(
     "🔍 Buscar trabajador",
     placeholder="Escribe apellido o nombre",
     key="busqueda",
-    on_change=lambda: None
+    on_change=refrescar_busqueda
 )
 
-busqueda = st.session_state.busqueda.strip()
+busqueda = st.session_state.filtro.strip()
 
 if busqueda:
     personal_filtrado = personal[
@@ -76,7 +79,7 @@ else:
 st.markdown("### 👥 Lista de personal")
 
 # -----------------------------
-# LISTA COMPLETA
+# LISTA DE PERSONAL
 # -----------------------------
 asistencia = []
 
@@ -87,7 +90,7 @@ for idx in personal_filtrado.index:
         col1, col2 = st.columns([1, 6])
 
         with col1:
-            asistio = st.checkbox("✔️", key=f"chk_{idx}")
+            asistio = st.checkbox("", key=f"chk_{idx}")
 
         with col2:
             st.markdown(f"**{nombre}**")
@@ -190,5 +193,6 @@ Se adjunta el archivo PDF con el registro.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
+
 
 
