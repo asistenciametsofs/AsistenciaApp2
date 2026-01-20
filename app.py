@@ -5,14 +5,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # -----------------------------
-# Leer CSV (corrige ï»¿Nombre)
+# Leer CSV SIN encabezado
 # -----------------------------
 personal = pd.read_csv(
     "personal.csv",
-    encoding="utf-8-sig",   # <-- CLAVE
-    header=None,
-    names=["Nombre"]
-).dropna()
+    encoding="utf-8-sig",
+    header=None
+)
+
+personal = personal.iloc[:, 0].astype(str)
+personal = personal[personal.str.lower() != "nombre"]
 
 # -----------------------------
 # Configuración página
@@ -35,34 +37,18 @@ supervisor = st.selectbox(
 st.markdown("### Lista de asistencia")
 
 # -----------------------------
-# Encabezados
-# -----------------------------
-h1, h2, h3, h4 = st.columns([0.7, 4, 2, 3])
-
-with h1:
-    st.markdown("**✔**")
-with h2:
-    st.markdown("**Nombre**")
-with h3:
-    st.markdown("**Estado**")
-with h4:
-    st.markdown("**Observación**")
-
-st.divider()
-
-# -----------------------------
-# Tabla asistencia
+# Lista asistencia (SIN encabezados)
 # -----------------------------
 asistencia = []
 
-for i, row in personal.iterrows():
+for i, nombre in enumerate(personal):
     col1, col2, col3, col4 = st.columns([0.7, 4, 2, 3])
 
     with col1:
         asistio = st.checkbox("", key=f"chk_{i}")
 
     with col2:
-        st.write(row["Nombre"])
+        st.write(nombre)
 
     with col3:
         estado = st.selectbox(
@@ -75,7 +61,7 @@ for i, row in personal.iterrows():
         comentario = st.text_input("", key=f"obs_{i}")
 
     asistencia.append({
-        "Nombre": row["Nombre"],
+        "Nombre": nombre,
         "Asistió": asistio,
         "Estado": estado,
         "Comentario": comentario
