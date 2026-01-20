@@ -33,6 +33,12 @@ personal = personal.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"]
 
 # -----------------------------
+# SESSION STATE
+# -----------------------------
+if "busqueda" not in st.session_state:
+    st.session_state.busqueda = ""
+
+# -----------------------------
 # DATOS GENERALES
 # -----------------------------
 fecha = st.date_input("📅 Fecha")
@@ -49,12 +55,16 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR (SOLO FILTRA)
+# BUSCADOR (FILTRA EN VIVO)
 # -----------------------------
-busqueda = st.text_input(
+st.text_input(
     "🔍 Buscar trabajador",
-    placeholder="Escribe apellido o nombre"
+    placeholder="Escribe apellido o nombre",
+    key="busqueda",
+    on_change=lambda: None
 )
+
+busqueda = st.session_state.busqueda.strip()
 
 if busqueda:
     personal_filtrado = personal[
@@ -66,7 +76,7 @@ else:
 st.markdown("### 👥 Lista de personal")
 
 # -----------------------------
-# LISTA COMPLETA (MOBILE)
+# LISTA COMPLETA
 # -----------------------------
 asistencia = []
 
