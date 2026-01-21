@@ -35,8 +35,8 @@ personal = personal[personal.str.lower() != "nombre"].tolist()
 # -----------------------------
 # SESSION STATE
 # -----------------------------
-if "seleccionados" not in st.session_state:
-    st.session_state.seleccionados = []
+if "registros" not in st.session_state:
+    st.session_state.registros = {}
 
 # -----------------------------
 # DATOS GENERALES
@@ -55,68 +55,85 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR REAL (AUTOFILTRO)
+# BUSCADOR AUTOMÁTICO
 # -----------------------------
-st.subheader("🔍 Buscar y agregar trabajador")
-
-seleccion = st.multiselect(
-    "Escribe apellido o nombre",
-    options=personal,
-    placeholder="Buscar...",
+busqueda = st.text_input(
+    "🔍 Buscar trabajador",
+    placeholder="Escribe apellido o nombre",
     label_visibility="collapsed"
 )
 
-col1, col2 = st.columns([1, 1])
-with col2:
-    if st.button("🧹 Limpiar búsqueda"):
-        st.session_state.seleccionados = []
-        st.rerun()
+if busqueda:
+    personal_filtrado = [
+        p for p in personal
+        if busqueda.lower() in p.lower()
+    ]
+else:
+    personal_filtrado = personal
 
-for nombre in seleccion:
-    if nombre not in [x["Nombre"] for x in st.session_state.seleccionados]:
-        st.session_state.seleccionados.append({
-            "Nombre": nombre,
-            "Asistió": True,
+# -----------------------------
+# LISTA
+# -----------------------------
+st.markdown("### 👥 Personal")
+
+for nombre in personal_filtrado:
+
+    if nombre not in st.session_state.registros:
+        st.session_state.registros[nombre] = {
+            "Asistió": False,
             "Estado": "Sin observación",
-            "Comentario": ""
-        })
+            "Comentario": "",
+            "Foto": None
+        }
 
+    data = st.session_state.registros[nombre]
+
+    with st.container(border=True):
+        col1, col2, col3 = st.columns([1, 5, 1])
+
+        with col1:
+            data["Asistió"] = st.checkbox(
+                "✔️",
+                value=data["Asistió"],
+                key=f"chk_{nombre}"
+            )
+
+        with col2:
+            st.markdown(f"**{nombre}**")
+
+            data["Estado"] = st.radio(
+                "Estado",
+                ["Sin observación", "Observado"],
+                horizontal=True,
+                key=f"estado_{nombre}"
+            )
+
+            if data["Estado"] == "Observado":
+                data["Comentario"] = st.text_input(
+                    "Observación",
+                    placeholder="Ej: 0.15 / aliento etílico",
+                    key=f"obs_{nombre}"
+                )
+                data["Foto"] = st.camera_input(
+                    "📸 Fotografía (opcional)",
+                    key=f"foto_{nombre}"
+                )
+            else:
+                data["Comentario"] = ""
+                data["Foto"] = None
+
+        with col3:
+            if st.button("🗑️", key=f"del_{nombre}"):
+                del st.session_state.registros[nombre]
+                st.rerun()
+
+# -----------------------------
+# ENVIAR
+# -----------------------------
 st.divider()
 
-# -----------------------------
-# LISTA SELECCIONADA
-# -----------------------------
-st.subheader("👥 Personal evaluado")
-
-for i, item in enumerate(st.session_state.seleccionados):
-    with st.container(border=True):
-
-        st.markdown(f"**{item['Nombre']}**")
-
-        estado = st.radio(
-            "Estado",
-            ["Sin observación", "Observado"],
-            horizontal=True,
-            key=f"estado_{i}"
-        )
-
-        item["Estado"] = estado
-
-        if estado == "Observado":
-            item["Comentario"] = st.text_input(
-                "Observación",
-                placeholder="Ej: Aliento etílico / 0.15",
-                key=f"obs_{i}"
-            )
-        else:
-            item["Comentario"] = ""
-
-# -----------------------------
-# BOTÓN ENVIAR
-# -----------------------------
 if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
-    # -------- PDF --------
     pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(pdf_temp.name, pagesize=A4)
     width, height = A4
@@ -132,34 +149,22 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     c.drawString(40, y, f"Supervisor: {supervisor}")
     y -= 30
 
-    for item in st.session_state.seleccionados:
-        if item["Estado"] == "Observado":
-            c.setFillColor(colors.red)
-        else:
-            c.setFillColor(colors.green)
+    for nombre, item in st.session_state.registros.items():
+        if item["Asistió"]:
+            if item["Estado"] == "Observado":
+                c.setFillColor(colors.red)
+            else:
+                c.setFillColor(colors.green)
 
-        texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']}"
-        c.drawString(40, y, texto)
-        y -= 14
+            texto = f"- {nombre} | {item['Estado']} | {item['Comentario']}"
+            c.drawString(40, y, texto)
+            y -= 14
 
-        if y < 60:
-            c.showPage()
-            y = height - 40
+            if y < 60:
+                c.showPage()
+                y = height - 40
 
     c.save()
-
-        # -----------------------------
-    # DESCARGA DEL PDF
-    # -----------------------------
-    with open(pdf_temp.name, "rb") as pdf_file:
-        st.download_button(
-            label="⬇️ Descargar PDF",
-            data=pdf_file,
-            file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
-
 
     # -------- MAIL --------
     remitente = st.secrets["gmail_user"]
@@ -176,7 +181,7 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 Fecha: {fecha}
 Supervisor: {supervisor}
 
-Se adjunta el archivo PDF con el registro.
+Se adjunta el archivo PDF.
 """
     msg.attach(MIMEText(cuerpo, "plain"))
 
@@ -199,4 +204,10 @@ Se adjunta el archivo PDF con el registro.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
+    st.download_button(
+        "⬇️ Descargar PDF",
+        data=open(pdf_temp.name, "rb"),
+        file_name=f"Lista_Alcohotest_{fecha}.pdf"
+    )
+
 
