@@ -45,14 +45,13 @@ personal = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
 personal = personal.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"].tolist()
 
+personal_norm = {normalizar(p): p for p in personal}
+
 # -----------------------------
 # STATE
 # -----------------------------
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
-
-if "reset" not in st.session_state:
-    st.session_state.reset = False
 
 # -----------------------------
 # DATOS GENERALES
@@ -71,30 +70,42 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR DROPDOWN
+# BUSCADOR REAL (SIN TEXTO, CON TILDES)
 # -----------------------------
 st.subheader("🔍 Buscar trabajador")
 
-busqueda = st.selectbox(
-    "Buscar por nombre o apellido",
-    options=[""] + [
-        p for p in personal
-        if normalizar(p) not in [
-            normalizar(x["Nombre"]) for x in st.session_state.seleccionados
-        ]
-    ],
-    format_func=lambda x: "Escribe para buscar..." if x == "" else x
+busqueda = st.text_input(
+    "",
+    placeholder="Buscar por nombre o apellido"
 )
 
 if busqueda:
-    st.session_state.seleccionados.append({
-        "id": str(uuid.uuid4()),
-        "Nombre": busqueda,
-        "Estado": "Sin observación",
-        "Comentario": "",
-        "Foto": None
-    })
-    st.rerun()
+    buscado = normalizar(busqueda)
+
+    opciones = [
+        p for p in personal
+        if buscado in normalizar(p)
+        and p not in [x["Nombre"] for x in st.session_state.seleccionados]
+    ]
+else:
+    opciones = []
+
+if opciones:
+    seleccionado = st.selectbox(
+        "Resultados",
+        options=opciones,
+        label_visibility="collapsed"
+    )
+
+    if st.button("➕ Agregar"):
+        st.session_state.seleccionados.append({
+            "id": str(uuid.uuid4()),
+            "Nombre": seleccionado,
+            "Estado": "Sin observación",
+            "Comentario": "",
+            "Foto": None
+        })
+        st.rerun()
 
 st.divider()
 
@@ -239,5 +250,4 @@ Se adjunta el archivo PDF con el registro.
     if st.button("➕ Registrar otro control"):
         st.session_state.seleccionados = []
         st.rerun()
-
 
