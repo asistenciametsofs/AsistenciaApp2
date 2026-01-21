@@ -1,31 +1,26 @@
 import streamlit as st
 import pandas as pd
-import smtplib
 import tempfile
 import uuid
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
 # -----------------------------
-# CONFIGURACIÓN GENERAL
+# CONFIG
 # -----------------------------
 st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
 st.title("🧪 REGISTRO DE ALCOHOTEST")
 
 # -----------------------------
-# LEER PERSONAL
+# PERSONAL
 # -----------------------------
 personal = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
 personal = personal.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"].tolist()
 
 # -----------------------------
-# SESSION STATE
+# STATE
 # -----------------------------
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
@@ -47,26 +42,30 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR
+# BUSCADOR REAL (SIN ENTER)
 # -----------------------------
-st.subheader("🔍 Buscar y agregar trabajador")
+st.subheader("🔍 Buscar trabajador")
 
-seleccion = st.multiselect(
-    "Buscar trabajador",
-    options=personal,
-    placeholder="Escribe apellido o nombre",
+busqueda = st.text_input(
+    "Buscar por apellido o nombre",
+    placeholder="Ej: Pérez",
     label_visibility="collapsed"
 )
 
-if st.button("🧹 Limpiar todo"):
-    st.session_state.seleccionados = []
-    st.rerun()
+filtrados = [
+    p for p in personal
+    if busqueda.lower() in p.lower()
+    and p not in [x["Nombre"] for x in st.session_state.seleccionados]
+] if busqueda else []
 
-# Agregar sin duplicar
-nombres_existentes = [x["Nombre"] for x in st.session_state.seleccionados]
+# -----------------------------
+# RESULTADOS BUSQUEDA
+# -----------------------------
+for nombre in filtrados[:10]:
+    col1, col2 = st.columns([6, 1])
+    col1.write(nombre)
 
-for nombre in seleccion:
-    if nombre not in nombres_existentes:
+    if col2.button("➕", key=f"add_{nombre}"):
         st.session_state.seleccionados.append({
             "id": str(uuid.uuid4()),
             "Nombre": nombre,
@@ -74,40 +73,38 @@ for nombre in seleccion:
             "Comentario": "",
             "Foto": None
         })
+        st.rerun()
 
 st.divider()
 
 # -----------------------------
-# LISTA SELECCIONADA
+# LISTA FINAL
 # -----------------------------
 st.subheader("👥 Personal evaluado")
 
-id_a_borrar = None
+id_borrar = None
 
 for item in st.session_state.seleccionados:
     with st.container(border=True):
 
         col1, col2, col3 = st.columns([6, 2, 1])
 
-        with col1:
-            st.markdown(f"**{item['Nombre']}**")
+        col1.markdown(f"**{item['Nombre']}**")
 
-        with col2:
-            item["Estado"] = st.radio(
-                "Estado",
-                ["Sin observación", "Observado"],
-                horizontal=True,
-                key=f"estado_{item['id']}"
-            )
+        item["Estado"] = col2.radio(
+            "Estado",
+            ["Sin observación", "Observado"],
+            horizontal=True,
+            key=f"estado_{item['id']}"
+        )
 
-        with col3:
-            if st.button("🗑️", key=f"del_{item['id']}"):
-                id_a_borrar = item["id"]
+        if col3.button("🗑️", key=f"del_{item['id']}"):
+            id_borrar = item["id"]
 
         if item["Estado"] == "Observado":
             item["Comentario"] = st.text_input(
                 "Observación",
-                placeholder="Ej: Aliento etílico / 0.15",
+                placeholder="Ej: 0.15 / Aliento etílico",
                 key=f"obs_{item['id']}"
             )
         else:
@@ -119,17 +116,17 @@ for item in st.session_state.seleccionados:
             key=f"foto_{item['id']}"
         )
 
-# 🔥 BORRADO REAL Y SEGURO
-if id_a_borrar:
+# BORRAR REAL
+if id_borrar:
     st.session_state.seleccionados = [
-        x for x in st.session_state.seleccionados if x["id"] != id_a_borrar
+        x for x in st.session_state.seleccionados if x["id"] != id_borrar
     ]
     st.rerun()
 
 # -----------------------------
-# ENVIAR
+# PDF
 # -----------------------------
-if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
+if st.button("📄 GENERAR PDF", use_container_width=True):
 
     pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(pdf_temp.name, pagesize=A4)
@@ -167,6 +164,6 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
             use_container_width=True
         )
 
-    st.success("✅ Registro generado correctamente")
+    st.success("✅ PDF generado correctamente")
 
 
