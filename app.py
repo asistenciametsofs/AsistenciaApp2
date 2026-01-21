@@ -92,13 +92,13 @@ busqueda = st.selectbox(
 
 if busqueda:
     nombre_real = mapa_personal[busqueda]
-    st.session_state.seleccionados.append({
-        "id": str(uuid.uuid4()),
-        "Nombre": nombre_real,
-        "Estado": "Sin observación",
-        "Comentario": "",
-        "Foto": None
-    })
+    st.session_state.seleccionados.insert(0, {
+    "id": str(uuid.uuid4()),
+    "Nombre": nombre_real,
+    "Estado": "Sin observación",
+    "Comentario": "",
+    "Foto": None
+})
     st.rerun()
 
 st.divider()
@@ -249,3 +249,4 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
