@@ -15,7 +15,7 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 
 # -----------------------------
-# FUNCIONES AUXILIARES
+# FUNCIONES
 # -----------------------------
 def normalizar(texto):
     return ''.join(
@@ -24,8 +24,7 @@ def normalizar(texto):
     ).lower()
 
 def comprimir_imagen(uploaded_file):
-    img = Image.open(uploaded_file)
-    img = img.convert("RGB")
+    img = Image.open(uploaded_file).convert("RGB")
     temp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
     img.save(temp.name, format="JPEG", quality=40, optimize=True)
     return temp.name
@@ -43,16 +42,14 @@ personal_df = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
 personal = personal_df.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"].tolist()
 
-personal_norm = {p: normalizar(p) for p in personal}
-
 # -----------------------------
-# SESSION STATE
+# STATE
 # -----------------------------
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
 
-if "limpiar_buscador" not in st.session_state:
-    st.session_state.limpiar_buscador = False
+if "buscador" not in st.session_state:
+    st.session_state.buscador = []
 
 # -----------------------------
 # DATOS GENERALES
@@ -71,22 +68,19 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR DROPDOWN
+# BUSCADOR (SIEMPRE VISIBLE)
 # -----------------------------
 st.subheader("🔍 Buscar y agregar trabajador")
 
-if st.session_state.limpiar_buscador:
-    seleccion = []
-    st.session_state.limpiar_buscador = False
-else:
-    seleccion = st.multiselect(
-        "Buscar trabajador",
-        options=personal,
-        key="buscador",
-        placeholder="Escribe apellido o nombre",
-        label_visibility="collapsed"
-    )
+seleccion = st.multiselect(
+    "Buscar trabajador",
+    options=personal,
+    placeholder="Escribe apellido o nombre",
+    key="buscador",
+    label_visibility="collapsed"
+)
 
+# Agregar seleccionados
 for nombre in seleccion:
     if nombre not in [x["Nombre"] for x in st.session_state.seleccionados]:
         st.session_state.seleccionados.append({
@@ -96,8 +90,10 @@ for nombre in seleccion:
             "Comentario": "",
             "Foto": None
         })
-        st.session_state.limpiar_buscador = True
-        st.rerun()
+
+# LIMPIAR SOLO LA SELECCIÓN (NO EL WIDGET)
+if seleccion:
+    st.session_state.buscador = []
 
 st.divider()
 
@@ -177,7 +173,6 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
         y -= 15
 
         c.setFillColor(colors.black)
-
         if item["Comentario"]:
             c.drawString(50, y, f"Obs: {item['Comentario']}")
             y -= 15
@@ -192,7 +187,7 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
     c.save()
 
-    # -------- DESCARGA PDF --------
+    # DESCARGA
     with open(pdf_temp.name, "rb") as pdf_file:
         st.download_button(
             "⬇️ Descargar PDF",
@@ -202,7 +197,7 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
             use_container_width=True
         )
 
-    # -------- ENVÍO MAIL --------
+    # ENVÍO MAIL
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
     destinatarios = [d.strip() for d in st.secrets["destino"].split(",")]
@@ -212,25 +207,14 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     msg["To"] = ", ".join(destinatarios)
     msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
 
-    cuerpo = f"""REGISTRO DE ALCOHOTEST
-
-Fecha: {fecha}
-Supervisor: {supervisor}
-
-Se adjunta el archivo PDF.
-"""
-    msg.attach(MIMEText(cuerpo, "plain"))
+    msg.attach(MIMEText("Se adjunta registro de alcohotest.", "plain"))
 
     with open(pdf_temp.name, "rb") as f:
         part = MIMEBase("application", "octet-stream")
         part.set_payload(f.read())
 
     encoders.encode_base64(part)
-    part.add_header(
-        "Content-Disposition",
-        f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"'
-    )
-
+    part.add_header("Content-Disposition", f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"')
     msg.attach(part)
 
     server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -243,7 +227,7 @@ Se adjunta el archivo PDF.
 
     if st.button("🆕 Enviar otro registro"):
         st.session_state.seleccionados = []
-        st.session_state.limpiar_buscador = True
+        st.session_state.buscador = []
         st.rerun()
 
 
