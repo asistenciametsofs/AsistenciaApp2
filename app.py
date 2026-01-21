@@ -148,6 +148,19 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
     c.save()
 
+        # -----------------------------
+    # DESCARGA DEL PDF
+    # -----------------------------
+    with open(pdf_temp.name, "rb") as pdf_file:
+        st.download_button(
+            label="⬇️ Descargar PDF",
+            data=pdf_file,
+            file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
+
     # -------- MAIL --------
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
@@ -186,3 +199,4 @@ Se adjunta el archivo PDF con el registro.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
+
