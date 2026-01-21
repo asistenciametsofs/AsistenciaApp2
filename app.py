@@ -4,6 +4,8 @@ import smtplib
 import tempfile
 import uuid
 import unicodedata
+import io
+from PIL import Image
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -14,19 +16,31 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 
 # -----------------------------
-# FUNCION PARA BUSQUEDA SIN TILDES
-# -----------------------------
-def normalizar(texto):
-    return ''.join(
-        c for c in unicodedata.normalize("NFD", texto)
-        if unicodedata.category(c) != "Mn"
-    ).lower()
-
-# -----------------------------
 # CONFIG
 # -----------------------------
 st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
 st.title("🧪 REGISTRO DE ALCOHOTEST")
+
+# -----------------------------
+# FUNCIONES
+# -----------------------------
+def normalizar(texto):
+    return unicodedata.normalize("NFD", texto).encode("ascii", "ignore").decode("utf-8").lower()
+
+def comprimir_imagen(uploaded_file, max_size=800, calidad=60):
+    img = Image.open(uploaded_file)
+    img = img.convert("RGB")
+    img.thumbnail((max_size, max_size))
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", quality=calidad, optimize=True)
+    buffer.seek(0)
+    return buffer
+
+def limpiar_formulario():
+    st.session_state.seleccionados = []
+    st.session_state.busqueda = ""
+    st.rerun()
 
 # -----------------------------
 # PERSONAL
@@ -40,6 +54,9 @@ personal = personal[personal.str.lower() != "nombre"].tolist()
 # -----------------------------
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
+
+if "busqueda" not in st.session_state:
+    st.session_state.busqueda = ""
 
 # -----------------------------
 # DATOS GENERALES
@@ -58,30 +75,34 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR AUTOMATICO (SIN ENTER + SIN TILDES)
+# BUSCADOR CON DROPDOWN
 # -----------------------------
 st.subheader("🔍 Buscar trabajador")
 
-busqueda = st.text_input(
-    "Buscar por apellido o nombre",
+st.session_state.busqueda = st.text_input(
+    "Buscar por nombre o apellido",
+    value=st.session_state.busqueda,
     placeholder="Ej: Perez / Pérez",
     label_visibility="collapsed"
 )
 
-filtrados = [
+opciones = [
     p for p in personal
-    if normalizar(busqueda) in normalizar(p)
+    if normalizar(st.session_state.busqueda) in normalizar(p)
     and p not in [x["Nombre"] for x in st.session_state.seleccionados]
-] if busqueda else []
+]
 
-for nombre in filtrados[:10]:
-    col1, col2 = st.columns([6, 1])
-    col1.write(nombre)
+if opciones:
+    seleccionado = st.selectbox(
+        "Resultados",
+        opciones,
+        label_visibility="collapsed"
+    )
 
-    if col2.button("➕", key=f"add_{nombre}"):
+    if st.button("➕ Agregar trabajador"):
         st.session_state.seleccionados.append({
             "id": str(uuid.uuid4()),
-            "Nombre": nombre,
+            "Nombre": seleccionado,
             "Estado": "Sin observación",
             "Comentario": "",
             "Foto": None
@@ -172,13 +193,32 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
             y -= 15
 
         if item["Foto"]:
-            img = ImageReader(item["Foto"])
-            c.drawImage(img, 50, y - 80, width=100, height=80, preserveAspectRatio=True)
+            img_buffer = comprimir_imagen(item["Foto"])
+            img = ImageReader(img_buffer)
+            c.drawImage(
+                img,
+                50,
+                y - 80,
+                width=100,
+                height=80,
+                preserveAspectRatio=True,
+                mask="auto"
+            )
             y -= 90
 
         y -= 10
 
     c.save()
+
+    # -------- DESCARGA --------
+    with open(pdf_temp.name, "rb") as pdf_file:
+        st.download_button(
+            "⬇️ Descargar PDF",
+            data=pdf_file,
+            file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
     # -------- MAIL --------
     remitente = st.secrets["gmail_user"]
@@ -208,6 +248,7 @@ Se adjunta el archivo PDF con el registro.
         "Content-Disposition",
         f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"'
     )
+
     msg.attach(part)
 
     server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -216,24 +257,9 @@ Se adjunta el archivo PDF con el registro.
     server.sendmail(remitente, destinatarios, msg.as_string())
     server.quit()
 
-    # -------- RESULTADO FINAL --------
     st.success("✅ Registro enviado correctamente")
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        with open(pdf_temp.name, "rb") as pdf_file:
-            st.download_button(
-                "⬇️ Descargar PDF",
-                data=pdf_file,
-                file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-
-    with col2:
-        if st.button("🔄 Enviar otro registro", use_container_width=True):
-            st.session_state.seleccionados = []
-            st.rerun()
+    if st.button("🆕 Enviar otro registro"):
+        limpiar_formulario()
 
 
