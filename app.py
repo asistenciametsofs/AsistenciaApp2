@@ -31,7 +31,6 @@ def comprimir_imagen(uploaded_file, max_size=800, calidad=60):
     img = Image.open(uploaded_file)
     img = img.convert("RGB")
     img.thumbnail((max_size, max_size))
-
     buffer = io.BytesIO()
     img.save(buffer, format="JPEG", quality=calidad, optimize=True)
     buffer.seek(0)
@@ -39,7 +38,6 @@ def comprimir_imagen(uploaded_file, max_size=800, calidad=60):
 
 def limpiar_formulario():
     st.session_state.seleccionados = []
-    st.session_state.busqueda = ""
     st.rerun()
 
 # -----------------------------
@@ -55,8 +53,8 @@ personal = personal[personal.str.lower() != "nombre"].tolist()
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
 
-if "busqueda" not in st.session_state:
-    st.session_state.busqueda = ""
+if "buscador" not in st.session_state:
+    st.session_state.buscador = []
 
 # -----------------------------
 # DATOS GENERALES
@@ -75,39 +73,33 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR CON DROPDOWN
+# BUSCADOR ÚNICO (DIDÁCTICO)
 # -----------------------------
-st.subheader("🔍 Buscar trabajador")
+st.subheader("🔍 Buscar y agregar trabajador")
 
-st.session_state.busqueda = st.text_input(
-    "Buscar por nombre o apellido",
-    value=st.session_state.busqueda,
-    placeholder="Ej: Perez / Pérez",
-    label_visibility="collapsed"
+seleccion = st.multiselect(
+    "Buscar trabajador",
+    options=personal,
+    default=[],
+    key="buscador",
+    placeholder="Escribe apellido o nombre"
 )
 
-opciones = [
-    p for p in personal
-    if normalizar(st.session_state.busqueda) in normalizar(p)
-    and p not in [x["Nombre"] for x in st.session_state.seleccionados]
-]
-
-if opciones:
-    seleccionado = st.selectbox(
-        "Resultados",
-        opciones,
-        label_visibility="collapsed"
-    )
-
-    if st.button("➕ Agregar trabajador"):
+# Agregar seleccionados automáticamente
+for nombre in seleccion:
+    if nombre not in [x["Nombre"] for x in st.session_state.seleccionados]:
         st.session_state.seleccionados.append({
             "id": str(uuid.uuid4()),
-            "Nombre": seleccionado,
+            "Nombre": nombre,
             "Estado": "Sin observación",
             "Comentario": "",
             "Foto": None
         })
-        st.rerun()
+
+# Limpiar buscador después de agregar
+if seleccion:
+    st.session_state.buscador = []
+    st.rerun()
 
 st.divider()
 
@@ -161,7 +153,6 @@ if id_borrar:
 # -----------------------------
 if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
-    # -------- PDF --------
     pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(pdf_temp.name, pagesize=A4)
     width, height = A4
@@ -178,7 +169,6 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     y -= 30
 
     for item in st.session_state.seleccionados:
-
         if y < 120:
             c.showPage()
             y = height - 40
@@ -195,30 +185,12 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
         if item["Foto"]:
             img_buffer = comprimir_imagen(item["Foto"])
             img = ImageReader(img_buffer)
-            c.drawImage(
-                img,
-                50,
-                y - 80,
-                width=100,
-                height=80,
-                preserveAspectRatio=True,
-                mask="auto"
-            )
+            c.drawImage(img, 50, y - 80, width=100, height=80, preserveAspectRatio=True)
             y -= 90
 
         y -= 10
 
     c.save()
-
-    # -------- DESCARGA --------
-    with open(pdf_temp.name, "rb") as pdf_file:
-        st.download_button(
-            "⬇️ Descargar PDF",
-            data=pdf_file,
-            file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
 
     # -------- MAIL --------
     remitente = st.secrets["gmail_user"]
@@ -231,11 +203,9 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
 
     cuerpo = f"""REGISTRO DE ALCOHOTEST
-
 Fecha: {fecha}
 Supervisor: {supervisor}
-
-Se adjunta el archivo PDF con el registro.
+Se adjunta el archivo PDF.
 """
     msg.attach(MIMEText(cuerpo, "plain"))
 
@@ -258,8 +228,6 @@ Se adjunta el archivo PDF con el registro.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
-
     if st.button("🆕 Enviar otro registro"):
         limpiar_formulario()
-
 
