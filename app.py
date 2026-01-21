@@ -4,7 +4,6 @@ import smtplib
 import tempfile
 import uuid
 import unicodedata
-import io
 from PIL import Image
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -16,45 +15,44 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 
 # -----------------------------
+# FUNCIONES AUXILIARES
+# -----------------------------
+def normalizar(texto):
+    return ''.join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
+    ).lower()
+
+def comprimir_imagen(uploaded_file):
+    img = Image.open(uploaded_file)
+    img = img.convert("RGB")
+    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    img.save(temp.name, format="JPEG", quality=40, optimize=True)
+    return temp.name
+
+# -----------------------------
 # CONFIG
 # -----------------------------
 st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
 st.title("🧪 REGISTRO DE ALCOHOTEST")
 
 # -----------------------------
-# FUNCIONES
-# -----------------------------
-def normalizar(texto):
-    return unicodedata.normalize("NFD", texto).encode("ascii", "ignore").decode("utf-8").lower()
-
-def comprimir_imagen(uploaded_file, max_size=800, calidad=60):
-    img = Image.open(uploaded_file)
-    img = img.convert("RGB")
-    img.thumbnail((max_size, max_size))
-    buffer = io.BytesIO()
-    img.save(buffer, format="JPEG", quality=calidad, optimize=True)
-    buffer.seek(0)
-    return buffer
-
-def limpiar_formulario():
-    st.session_state.seleccionados = []
-    st.rerun()
-
-# -----------------------------
 # PERSONAL
 # -----------------------------
-personal = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
-personal = personal.iloc[:, 0].astype(str)
+personal_df = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
+personal = personal_df.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"].tolist()
 
+personal_norm = {p: normalizar(p) for p in personal}
+
 # -----------------------------
-# STATE
+# SESSION STATE
 # -----------------------------
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
 
-if "buscador" not in st.session_state:
-    st.session_state.buscador = []
+if "limpiar_buscador" not in st.session_state:
+    st.session_state.limpiar_buscador = False
 
 # -----------------------------
 # DATOS GENERALES
@@ -73,19 +71,22 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR ÚNICO (DIDÁCTICO)
+# BUSCADOR DROPDOWN
 # -----------------------------
 st.subheader("🔍 Buscar y agregar trabajador")
 
-seleccion = st.multiselect(
-    "Buscar trabajador",
-    options=personal,
-    default=[],
-    key="buscador",
-    placeholder="Escribe apellido o nombre"
-)
+if st.session_state.limpiar_buscador:
+    seleccion = []
+    st.session_state.limpiar_buscador = False
+else:
+    seleccion = st.multiselect(
+        "Buscar trabajador",
+        options=personal,
+        key="buscador",
+        placeholder="Escribe apellido o nombre",
+        label_visibility="collapsed"
+    )
 
-# Agregar seleccionados automáticamente
 for nombre in seleccion:
     if nombre not in [x["Nombre"] for x in st.session_state.seleccionados]:
         st.session_state.seleccionados.append({
@@ -95,11 +96,8 @@ for nombre in seleccion:
             "Comentario": "",
             "Foto": None
         })
-
-# Limpiar buscador después de agregar
-if seleccion:
-    st.session_state.buscador = []
-    st.rerun()
+        st.session_state.limpiar_buscador = True
+        st.rerun()
 
 st.divider()
 
@@ -169,7 +167,8 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     y -= 30
 
     for item in st.session_state.seleccionados:
-        if y < 120:
+
+        if y < 150:
             c.showPage()
             y = height - 40
 
@@ -178,21 +177,32 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
         y -= 15
 
         c.setFillColor(colors.black)
+
         if item["Comentario"]:
             c.drawString(50, y, f"Obs: {item['Comentario']}")
             y -= 15
 
         if item["Foto"]:
-            img_buffer = comprimir_imagen(item["Foto"])
-            img = ImageReader(img_buffer)
-            c.drawImage(img, 50, y - 80, width=100, height=80, preserveAspectRatio=True)
+            img_path = comprimir_imagen(item["Foto"])
+            img = ImageReader(img_path)
+            c.drawImage(img, 50, y - 80, width=100, height=80)
             y -= 90
 
         y -= 10
 
     c.save()
 
-    # -------- MAIL --------
+    # -------- DESCARGA PDF --------
+    with open(pdf_temp.name, "rb") as pdf_file:
+        st.download_button(
+            "⬇️ Descargar PDF",
+            data=pdf_file,
+            file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
+    # -------- ENVÍO MAIL --------
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
     destinatarios = [d.strip() for d in st.secrets["destino"].split(",")]
@@ -203,8 +213,10 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
 
     cuerpo = f"""REGISTRO DE ALCOHOTEST
+
 Fecha: {fecha}
 Supervisor: {supervisor}
+
 Se adjunta el archivo PDF.
 """
     msg.attach(MIMEText(cuerpo, "plain"))
@@ -228,6 +240,10 @@ Se adjunta el archivo PDF.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
+
     if st.button("🆕 Enviar otro registro"):
-        limpiar_formulario()
+        st.session_state.seleccionados = []
+        st.session_state.limpiar_buscador = True
+        st.rerun()
+
 
