@@ -24,9 +24,9 @@ st.title("🧪 REGISTRO DE ALCOHOTEST")
 # -----------------------------
 # FUNCIONES
 # -----------------------------
-def normalizar(texto):
+def normalizar(txt):
     return ''.join(
-        c for c in unicodedata.normalize("NFD", texto)
+        c for c in unicodedata.normalize("NFD", txt)
         if unicodedata.category(c) != "Mn"
     ).lower()
 
@@ -44,8 +44,6 @@ def comprimir_imagen(file, max_size=(800, 600), quality=60):
 personal = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
 personal = personal.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"].tolist()
-
-personal_norm = {normalizar(p): p for p in personal}
 
 # -----------------------------
 # STATE
@@ -70,42 +68,31 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR REAL (SIN TEXTO, CON TILDES)
+# BUSCADOR DROPDOWN (COMO ANTES)
 # -----------------------------
 st.subheader("🔍 Buscar trabajador")
 
-busqueda = st.text_input(
-    "",
-    placeholder="Buscar por nombre o apellido"
+# nombres aún NO agregados
+disponibles = [
+    p for p in personal
+    if normalizar(p) not in [normalizar(x["Nombre"]) for x in st.session_state.seleccionados]
+]
+
+seleccion = st.selectbox(
+    "Buscar",
+    options=[""] + disponibles,
+    label_visibility="collapsed"
 )
 
-if busqueda:
-    buscado = normalizar(busqueda)
-
-    opciones = [
-        p for p in personal
-        if buscado in normalizar(p)
-        and p not in [x["Nombre"] for x in st.session_state.seleccionados]
-    ]
-else:
-    opciones = []
-
-if opciones:
-    seleccionado = st.selectbox(
-        "Resultados",
-        options=opciones,
-        label_visibility="collapsed"
-    )
-
-    if st.button("➕ Agregar"):
-        st.session_state.seleccionados.append({
-            "id": str(uuid.uuid4()),
-            "Nombre": seleccionado,
-            "Estado": "Sin observación",
-            "Comentario": "",
-            "Foto": None
-        })
-        st.rerun()
+if seleccion:
+    st.session_state.seleccionados.append({
+        "id": str(uuid.uuid4()),
+        "Nombre": seleccion,
+        "Estado": "Sin observación",
+        "Comentario": "",
+        "Foto": None
+    })
+    st.rerun()
 
 st.divider()
 
@@ -218,25 +205,17 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     msg["To"] = ", ".join(destinatarios)
     msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
 
-    cuerpo = f"""REGISTRO DE ALCOHOTEST
-
-Fecha: {fecha}
-Supervisor: {supervisor}
-
-Se adjunta el archivo PDF con el registro.
-"""
-    msg.attach(MIMEText(cuerpo, "plain"))
+    msg.attach(MIMEText(
+        f"REGISTRO DE ALCOHOTEST\n\nFecha: {fecha}\nSupervisor: {supervisor}",
+        "plain"
+    ))
 
     with open(pdf_temp.name, "rb") as f:
         part = MIMEBase("application", "octet-stream")
         part.set_payload(f.read())
 
     encoders.encode_base64(part)
-    part.add_header(
-        "Content-Disposition",
-        f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"'
-    )
-
+    part.add_header("Content-Disposition", f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"')
     msg.attach(part)
 
     server = smtplib.SMTP("smtp.gmail.com", 587)
