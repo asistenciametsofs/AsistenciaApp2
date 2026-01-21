@@ -55,7 +55,7 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR REAL (AUTOFILTRO)
+# BUSCADOR
 # -----------------------------
 st.subheader("🔍 Buscar y agregar trabajador")
 
@@ -89,6 +89,8 @@ st.divider()
 # -----------------------------
 st.subheader("👥 Personal evaluado")
 
+indice_a_borrar = None  # 👈 CLAVE
+
 for i, item in enumerate(st.session_state.seleccionados):
     with st.container(border=True):
 
@@ -107,8 +109,7 @@ for i, item in enumerate(st.session_state.seleccionados):
 
         with col3:
             if st.button("🗑️", key=f"del_{i}"):
-                st.session_state.seleccionados.pop(i)
-                st.rerun()
+                indice_a_borrar = i
 
         # Observación SOLO si es observado
         if item["Estado"] == "Observado":
@@ -126,6 +127,11 @@ for i, item in enumerate(st.session_state.seleccionados):
             type=["jpg", "png", "jpeg"],
             key=f"foto_{i}"
         )
+
+# 👉 eliminar FUERA del loop
+if indice_a_borrar is not None:
+    st.session_state.seleccionados.pop(indice_a_borrar)
+    st.rerun()
 
 # -----------------------------
 # BOTÓN ENVIAR
@@ -149,10 +155,7 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     y -= 30
 
     for item in st.session_state.seleccionados:
-        if item["Estado"] == "Observado":
-            c.setFillColor(colors.red)
-        else:
-            c.setFillColor(colors.green)
+        c.setFillColor(colors.red if item["Estado"] == "Observado" else colors.green)
 
         tiene_foto = "Sí" if item["Foto"] else "No"
         texto = f"- {item['Nombre']} | {item['Estado']} | {item['Comentario']} | Foto: {tiene_foto}"
@@ -213,6 +216,5 @@ Se adjunta el archivo PDF con el registro.
     server.quit()
 
     st.success("✅ Registro enviado correctamente")
-
 
 
