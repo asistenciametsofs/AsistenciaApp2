@@ -3,6 +3,7 @@ import pandas as pd
 import smtplib
 import tempfile
 import uuid
+import unicodedata
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -11,6 +12,15 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
+
+# -----------------------------
+# FUNCION PARA BUSQUEDA SIN TILDES
+# -----------------------------
+def normalizar(texto):
+    return ''.join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
+    ).lower()
 
 # -----------------------------
 # CONFIG
@@ -48,19 +58,19 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR REAL (SIN ENTER)
+# BUSCADOR AUTOMATICO (SIN ENTER + SIN TILDES)
 # -----------------------------
 st.subheader("🔍 Buscar trabajador")
 
 busqueda = st.text_input(
     "Buscar por apellido o nombre",
-    placeholder="Ej: Pérez",
+    placeholder="Ej: Perez / Pérez",
     label_visibility="collapsed"
 )
 
 filtrados = [
     p for p in personal
-    if busqueda.lower() in p.lower()
+    if normalizar(busqueda) in normalizar(p)
     and p not in [x["Nombre"] for x in st.session_state.seleccionados]
 ] if busqueda else []
 
@@ -170,16 +180,6 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
     c.save()
 
-    # -------- DESCARGA --------
-    with open(pdf_temp.name, "rb") as pdf_file:
-        st.download_button(
-            "⬇️ Descargar PDF",
-            data=pdf_file,
-            file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
-
     # -------- MAIL --------
     remitente = st.secrets["gmail_user"]
     contraseña = st.secrets["gmail_password"]
@@ -208,7 +208,6 @@ Se adjunta el archivo PDF con el registro.
         "Content-Disposition",
         f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"'
     )
-
     msg.attach(part)
 
     server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -217,5 +216,24 @@ Se adjunta el archivo PDF con el registro.
     server.sendmail(remitente, destinatarios, msg.as_string())
     server.quit()
 
-    st.success("✅ Registro enviado por correo correctamente")
+    # -------- RESULTADO FINAL --------
+    st.success("✅ Registro enviado correctamente")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        with open(pdf_temp.name, "rb") as pdf_file:
+            st.download_button(
+                "⬇️ Descargar PDF",
+                data=pdf_file,
+                file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+    with col2:
+        if st.button("🔄 Enviar otro registro", use_container_width=True):
+            st.session_state.seleccionados = []
+            st.rerun()
+
 
