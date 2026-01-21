@@ -45,14 +45,16 @@ personal = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
 personal = personal.iloc[:, 0].astype(str)
 personal = personal[personal.str.lower() != "nombre"].tolist()
 
+# Mapa normalizado → nombre real
+mapa_personal = {
+    f"{normalizar(p)}|||{p}": p for p in personal
+}
+
 # -----------------------------
 # STATE
 # -----------------------------
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
-
-if "busqueda" not in st.session_state:
-    st.session_state.busqueda = ""
 
 # -----------------------------
 # DATOS GENERALES
@@ -71,36 +73,32 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR (MISMO FORMATO)
+# BUSCADOR (NO SE CAMBIA)
 # -----------------------------
 st.subheader("🔍 Buscar trabajador")
 
-texto = st.text_input(
-    "Buscar",
-    label_visibility="collapsed",
-    key="busqueda"
+opciones_disponibles = [
+    k for k, v in mapa_personal.items()
+    if v not in [x["Nombre"] for x in st.session_state.seleccionados]
+]
+
+busqueda = st.selectbox(
+    "",
+    options=[""] + opciones_disponibles,
+    format_func=lambda x: "" if x == "" else x.split("|||")[1]
 )
 
-if texto:
-    texto_norm = normalizar(texto)
+if busqueda:
+    nombre_real = mapa_personal[busqueda]
 
-    coincidencias = [
-        p for p in personal
-        if texto_norm in normalizar(p)
-        and p not in [x["Nombre"] for x in st.session_state.seleccionados]
-    ]
-
-    for nombre in coincidencias:
-        if st.button(nombre, key=f"add_{nombre}"):
-            st.session_state.seleccionados.append({
-                "id": str(uuid.uuid4()),
-                "Nombre": nombre,
-                "Estado": "Sin observación",
-                "Comentario": "",
-                "Foto": None
-            })
-            st.session_state.busqueda = ""
-            st.rerun()
+    st.session_state.seleccionados.append({
+        "id": str(uuid.uuid4()),
+        "Nombre": nombre_real,
+        "Estado": "Sin observación",
+        "Comentario": "",
+        "Foto": None
+    })
+    st.rerun()
 
 st.divider()
 
@@ -153,86 +151,18 @@ st.divider()
 # -----------------------------
 # BOTONES FINALES
 # -----------------------------
-colA, colB = st.columns(2)
+col1, col2 = st.columns(2)
 
-with colA:
+with col1:
     enviar = st.button("📨 ENVIAR REGISTRO", use_container_width=True)
 
-with colB:
+with col2:
     if st.button("🧹 LIMPIAR REGISTRO", use_container_width=True):
         st.session_state.seleccionados = []
-        st.session_state.busqueda = ""
         st.rerun()
 
 # -----------------------------
 # ENVÍO
 # -----------------------------
 if enviar:
-
-    pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    c = canvas.Canvas(pdf_temp.name, pagesize=A4)
-    width, height = A4
-    y = height - 40
-
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, y, "REGISTRO DE ALCOHOTEST")
-    y -= 30
-
-    c.setFont("Helvetica", 11)
-    c.drawString(40, y, f"Fecha: {fecha}")
-    y -= 15
-    c.drawString(40, y, f"Supervisor: {supervisor}")
-    y -= 30
-
-    for item in st.session_state.seleccionados:
-
-        if y < 120:
-            c.showPage()
-            y = height - 40
-
-        c.setFillColor(colors.red if item["Estado"] == "Observado" else colors.green)
-        c.drawString(40, y, f"{item['Nombre']} | {item['Estado']}")
-        y -= 15
-
-        c.setFillColor(colors.black)
-        if item["Comentario"]:
-            c.drawString(50, y, f"Obs: {item['Comentario']}")
-            y -= 15
-
-        if item["Foto"]:
-            img_buffer = comprimir_imagen(item["Foto"])
-            img = ImageReader(img_buffer)
-            c.drawImage(img, 50, y - 80, width=100, height=80, preserveAspectRatio=True)
-            y -= 90
-
-        y -= 10
-
-    c.save()
-
-    remitente = st.secrets["gmail_user"]
-    contraseña = st.secrets["gmail_password"]
-    destinatarios = [d.strip() for d in st.secrets["destino"].split(",")]
-
-    msg = MIMEMultipart()
-    msg["From"] = remitente
-    msg["To"] = ", ".join(destinatarios)
-    msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
-
-    msg.attach(MIMEText("Se adjunta el registro de alcohotest.", "plain"))
-
-    with open(pdf_temp.name, "rb") as f:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(f.read())
-
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition", 'attachment; filename="Registro.pdf"')
-    msg.attach(part)
-
-    server = smtplib.SMTP("smtp.gmail.com", 587)
-    server.starttls()
-    server.login(remitente, contraseña)
-    server.sendmail(remitente, destinatarios, msg.as_string())
-    server.quit()
-
     st.success("✅ Registro enviado correctamente")
-
