@@ -4,7 +4,6 @@ import smtplib
 import tempfile
 import uuid
 import unicodedata
-from PIL import Image
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -13,6 +12,14 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
+from PIL import Image
+import io
+
+# -----------------------------
+# CONFIG
+# -----------------------------
+st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
+st.title("🧪 REGISTRO DE ALCOHOTEST")
 
 # -----------------------------
 # FUNCIONES
@@ -23,24 +30,19 @@ def normalizar(texto):
         if unicodedata.category(c) != "Mn"
     ).lower()
 
-def comprimir_imagen(uploaded_file):
-    img = Image.open(uploaded_file).convert("RGB")
-    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-    img.save(temp.name, format="JPEG", quality=40, optimize=True)
-    return temp.name
-
-# -----------------------------
-# CONFIG
-# -----------------------------
-st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
-st.title("🧪 REGISTRO DE ALCOHOTEST")
+def comprimir_imagen(file, max_size=(800, 800), quality=60):
+    img = Image.open(file)
+    img.thumbnail(max_size)
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", quality=quality)
+    buffer.seek(0)
+    return buffer
 
 # -----------------------------
 # PERSONAL
 # -----------------------------
-personal_df = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
-personal = personal_df.iloc[:, 0].astype(str)
-personal = personal[personal.str.lower() != "nombre"].tolist()
+personal = pd.read_csv("personal.csv", encoding="utf-8-sig", header=None)
+personal = personal.iloc[:, 0].astype(str).tolist()
 
 # -----------------------------
 # STATE
@@ -48,8 +50,8 @@ personal = personal[personal.str.lower() != "nombre"].tolist()
 if "seleccionados" not in st.session_state:
     st.session_state.seleccionados = []
 
-if "buscador" not in st.session_state:
-    st.session_state.buscador = []
+if "buscador_id" not in st.session_state:
+    st.session_state.buscador_id = 0
 
 # -----------------------------
 # DATOS GENERALES
@@ -68,21 +70,25 @@ supervisor = st.selectbox(
 st.divider()
 
 # -----------------------------
-# BUSCADOR (SIEMPRE VISIBLE)
+# BUSCADOR (SIEMPRE ACTIVO)
 # -----------------------------
 st.subheader("🔍 Buscar y agregar trabajador")
 
+opciones = [
+    p for p in personal
+    if p not in [x["Nombre"] for x in st.session_state.seleccionados]
+]
+
 seleccion = st.multiselect(
     "Buscar trabajador",
-    options=personal,
-    placeholder="Escribe apellido o nombre",
-    key="buscador",
+    options=opciones,
+    placeholder="Escribe nombre o apellido",
+    key=f"buscador_{st.session_state.buscador_id}",
     label_visibility="collapsed"
 )
 
-# Agregar seleccionados
-for nombre in seleccion:
-    if nombre not in [x["Nombre"] for x in st.session_state.seleccionados]:
+if seleccion:
+    for nombre in seleccion:
         st.session_state.seleccionados.append({
             "id": str(uuid.uuid4()),
             "Nombre": nombre,
@@ -91,9 +97,8 @@ for nombre in seleccion:
             "Foto": None
         })
 
-# LIMPIAR SOLO LA SELECCIÓN (NO EL WIDGET)
-if seleccion:
-    st.session_state.buscador = []
+    st.session_state.buscador_id += 1
+    st.rerun()
 
 st.divider()
 
@@ -106,7 +111,6 @@ id_borrar = None
 
 for item in st.session_state.seleccionados:
     with st.container(border=True):
-
         col1, col2, col3 = st.columns([6, 2, 1])
 
         col1.markdown(f"**{item['Nombre']}**")
@@ -143,9 +147,23 @@ if id_borrar:
     st.rerun()
 
 # -----------------------------
-# ENVIAR REGISTRO
+# BOTONES FINALES
 # -----------------------------
-if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
+colA, colB = st.columns(2)
+
+with colA:
+    enviar = st.button("📨 ENVIAR REGISTRO", use_container_width=True)
+
+with colB:
+    if st.button("🧹 NUEVO REGISTRO", use_container_width=True):
+        st.session_state.seleccionados = []
+        st.session_state.buscador_id += 1
+        st.rerun()
+
+# -----------------------------
+# ENVIAR / PDF
+# -----------------------------
+if enviar and st.session_state.seleccionados:
 
     pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     c = canvas.Canvas(pdf_temp.name, pagesize=A4)
@@ -163,7 +181,6 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
     y -= 30
 
     for item in st.session_state.seleccionados:
-
         if y < 150:
             c.showPage()
             y = height - 40
@@ -178,8 +195,8 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
             y -= 15
 
         if item["Foto"]:
-            img_path = comprimir_imagen(item["Foto"])
-            img = ImageReader(img_path)
+            img_buffer = comprimir_imagen(item["Foto"])
+            img = ImageReader(img_buffer)
             c.drawImage(img, 50, y - 80, width=100, height=80)
             y -= 90
 
@@ -187,47 +204,14 @@ if st.button("📨 ENVIAR REGISTRO", use_container_width=True):
 
     c.save()
 
-    # DESCARGA
     with open(pdf_temp.name, "rb") as pdf_file:
         st.download_button(
             "⬇️ Descargar PDF",
             data=pdf_file,
-            file_name=f"Lista_Alcohotest_{fecha}_{supervisor}.pdf",
+            file_name=f"Lista_Alcohotest_{fecha}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
 
-    # ENVÍO MAIL
-    remitente = st.secrets["gmail_user"]
-    contraseña = st.secrets["gmail_password"]
-    destinatarios = [d.strip() for d in st.secrets["destino"].split(",")]
-
-    msg = MIMEMultipart()
-    msg["From"] = remitente
-    msg["To"] = ", ".join(destinatarios)
-    msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
-
-    msg.attach(MIMEText("Se adjunta registro de alcohotest.", "plain"))
-
-    with open(pdf_temp.name, "rb") as f:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(f.read())
-
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition", f'attachment; filename="Lista_Alcohotest_{fecha}.pdf"')
-    msg.attach(part)
-
-    server = smtplib.SMTP("smtp.gmail.com", 587)
-    server.starttls()
-    server.login(remitente, contraseña)
-    server.sendmail(remitente, destinatarios, msg.as_string())
-    server.quit()
-
-    st.success("✅ Registro enviado correctamente")
-
-    if st.button("🆕 Enviar otro registro"):
-        st.session_state.seleccionados = []
-        st.session_state.buscador = []
-        st.rerun()
-
+    st.success("✅ Registro generado correctamente")
 
