@@ -188,6 +188,14 @@ if enviar:
     c.drawString(40, y, "REGISTRO DE ALCOHOTEST")
     y -= 30
 
+    c.setFont("Helvetica", 10)
+    c.drawString(40, y, "Alcoholímetro Marca: Hanwei")
+    y -= 14
+    c.drawString(40, y, "Modelo: AT7000")
+    y -= 14
+    c.drawString(40, y, "Serie: 2C0702200018")
+    y -= 20
+
     c.setFont("Helvetica", 11)
     c.drawString(40, y, f"Fecha: {fecha}")
     y -= 15
@@ -259,6 +267,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
