@@ -19,7 +19,7 @@ import io
 # CONFIG
 # -----------------------------
 st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
-st.title("🧪 REGISTRO DE ALCOHOTEST")
+st.title("🧪 REGISTRO DE ASISTENCIA PRE-EMBARQUE")
 st.markdown(
     """
     <div style="margin-top:-10px; line-height:1.6;">
@@ -185,7 +185,7 @@ if enviar:
     y = height - 40
 
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, y, "REGISTRO DE ALCOHOTEST")
+    c.drawString(40, y, "REGISTRO DE ASISTENCIA PRE-EMBARQUE / PRUEBA DE ALCOHOTEST")
     y -= 30
 
     c.setFont("Helvetica", 10)
@@ -267,6 +267,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
