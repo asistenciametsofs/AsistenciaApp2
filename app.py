@@ -30,6 +30,15 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+st.divider()
+
+st.subheader("📝 Tipo de registro")
+
+tipo_registro = st.multiselect(
+    "",
+    ["Prueba de Alcoholemia", "Embarque a SMCV"],
+    default=[]
+)
 
 # -----------------------------
 # FUNCIONES
@@ -184,8 +193,9 @@ if enviar:
     width, height = A4
     y = height - 40
 
+    titulo = " / ".join(tipo_registro) if tipo_registro else "REGISTRO"
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, y, "REGISTRO DE ASISTENCIA PRE-EMBARQUE / PRUEBA DE ALCOHOTEST")
+    c.drawString(40, y, f"REGISTRO DE {titulo.upper()}")
     y -= 30
 
     c.setFont("Helvetica", 10)
@@ -267,6 +277,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
