@@ -19,6 +19,7 @@ import io
 # CONFIG
 # -----------------------------
 st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
+st.image("metso_logo.png", width=220)
 st.title("🧪 REGISTRO DE ASISTENCIA PRE-EMBARQUE")
 st.markdown(
     """
@@ -193,6 +194,16 @@ if enviar:
     width, height = A4
     y = height - 40
 
+    logo = ImageReader("metso_logo.png")
+    c.drawImage(
+    logo,
+    width - 170,      # posición derecha
+    height - 90,      # posición arriba
+    width=130,
+    preserveAspectRatio=True,
+    mask='auto'
+    )
+
     titulo = " / ".join(tipo_registro) if tipo_registro else "REGISTRO"
     c.setFont("Helvetica-Bold", 14)
     c.drawString(40, y, f"REGISTRO DE {titulo.upper()}")
@@ -277,6 +288,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
