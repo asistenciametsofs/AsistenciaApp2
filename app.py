@@ -86,7 +86,7 @@ supervisor = st.selectbox(
     "👷 Supervisor",
     [
         "Marco Sanz", "Daniel Herreros", "Daniel Aedo", "Freddy Marquez",
-        "Joey Abarca", "Wilmer Mixcan", "Gabriel Choque", "Lizeth Gonzales", "Victor Velasquez",
+        "Joey Abarca", "Wilmer Mixcan", "Gabriel Choque", "Elvis Zamata", "Lizeth Gonzales", "Victor Velasquez",
         "Jaime Vizcarra", "Juan Cojoma", "Diego Carpio", "Raul Cardenas"
     ]
 )
@@ -277,6 +277,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
