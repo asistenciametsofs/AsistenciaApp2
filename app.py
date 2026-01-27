@@ -20,6 +20,16 @@ import io
 # -----------------------------
 st.set_page_config(page_title="REGISTRO DE ALCOHOTEST", layout="wide")
 st.title("🧪 REGISTRO DE ALCOHOTEST")
+st.markdown(
+    """
+    <div style="margin-top:-10px; line-height:1.6;">
+        <strong>Alcoholímetro Marca:</strong> Hanwei<br>
+        <strong>Modelo:</strong> AT7000<br>
+        <strong>Serie:</strong> 2C0702200018
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # -----------------------------
 # FUNCIONES
@@ -249,5 +259,6 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
