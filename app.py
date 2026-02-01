@@ -199,7 +199,15 @@ if enviar:
     width, height = A4
     y = height - 40
 
-    logo = ImageReader("metso_logo.png")
+    from PIL import Image
+    import os
+
+    logo_path = os.path.join(os.path.dirname(__file__), "metso_logo.jpg")
+
+    logo_img = Image.open(logo_path)
+    logo = ImageReader(logo_img)
+
+    
     c.drawImage(
     logo,
     width - 170,      # posición derecha
@@ -307,6 +315,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
