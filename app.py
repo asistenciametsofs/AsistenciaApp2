@@ -200,11 +200,19 @@ if enviar:
     y = height - 40
 
     import os
+    from PIL import Image
+    import io
+    from reportlab.lib.utils import ImageReader
 
-    logo_path = "metso_logo.png"
+    logo_path = os.path.join(os.path.dirname(__file__), "metso_logo.png")
 
     if os.path.exists(logo_path):
-        logo = ImageReader(logo_path)
+        img_logo = Image.open(logo_path)
+        buffer_logo = io.BytesIO()
+        img_logo.save(buffer_logo, format="PNG")
+        buffer_logo.seek(0)
+
+        logo = ImageReader(buffer_logo)
         c.drawImage(
             logo,
             width - 170,
@@ -213,6 +221,7 @@ if enviar:
             preserveAspectRatio=True,
             mask='auto'
         )
+
 
     c.drawImage(
     logo,
@@ -321,6 +330,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
