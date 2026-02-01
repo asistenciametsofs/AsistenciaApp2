@@ -263,7 +263,7 @@ if enviar:
     msg["To"] = ", ".join(destinatarios)
     msg["Subject"] = f"Alcohotest {fecha} | Supervisor: {supervisor} | Obs: {con_obs}"
 
-        cuerpo_correo = f"""
+    cuerpo_correo = f"""
     REGISTRO DE ALCOHOTEST
 
     📅 Fecha: {fecha}
@@ -273,10 +273,10 @@ if enviar:
     ✅ Sin observación: {sin_obs}
     ⚠️ Con observación: {con_obs}
 
-     Se adjunta el registro completo en PDF.
-     """
+    Se adjunta el registro completo en PDF.
+    """
 
-        msg.attach(MIMEText(cuerpo_correo, "plain"))
+    msg.attach(MIMEText(cuerpo_correo, "plain"))
 
 
     with open(st.session_state.pdf_path, "rb") as f:
@@ -307,6 +307,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
