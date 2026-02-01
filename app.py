@@ -187,6 +187,11 @@ with col2:
 # -----------------------------
 if enviar:
 
+    # -------- RESUMEN DE PERSONAS --------
+    total_personas = len(st.session_state.seleccionados)
+    sin_obs = sum(1 for x in st.session_state.seleccionados if x["Estado"] == "Sin observación")
+    con_obs = sum(1 for x in st.session_state.seleccionados if x["Estado"] == "Observado")
+
     pdf_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     st.session_state.pdf_path = pdf_temp.name
 
@@ -256,9 +261,23 @@ if enviar:
     msg = MIMEMultipart()
     msg["From"] = remitente
     msg["To"] = ", ".join(destinatarios)
-    msg["Subject"] = f"Lista Alcohotest - {fecha} - {supervisor}"
+    msg["Subject"] = f"Alcohotest {fecha} | Supervisor: {supervisor} | Obs: {con_obs}"
 
-    msg.attach(MIMEText("Se adjunta el registro en PDF.", "plain"))
+        cuerpo_correo = f"""
+    REGISTRO DE ALCOHOTEST
+
+    📅 Fecha: {fecha}
+    👷 Supervisor: {supervisor}
+
+    👥 Total de personas evaluadas: {total_personas}
+    ✅ Sin observación: {sin_obs}
+    ⚠️ Con observación: {con_obs}
+
+     Se adjunta el registro completo en PDF.
+     """
+
+        msg.attach(MIMEText(cuerpo_correo, "plain"))
+
 
     with open(st.session_state.pdf_path, "rb") as f:
         part = MIMEBase("application", "octet-stream")
@@ -288,6 +307,7 @@ if st.session_state.pdf_path:
             mime="application/pdf",
             use_container_width=True
         )
+
 
 
 
