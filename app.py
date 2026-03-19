@@ -86,9 +86,9 @@ fecha = st.date_input("📅 Fecha")
 supervisor = st.selectbox(
     "👷 Supervisor",
     [
-        "Marco Sanz", "Daniel Herreros", "Daniel Aedo", "Freddy Marquez",
+        "Marco Sanz", "Angel Carrasco", "Daniel Aedo", "Freddy Marquez",
         "Joey Abarca", "Wilmer Mixcan", "Gabriel Choque", "Elvis Zamata", "Lizeth Gonzales", "Victor Velasquez",
-        "Jaime Vizcarra", "Juan Cojoma", "Diego Carpio", "Raul Cardenas"
+        "Jaime Vizcarra", "Juan Cojoma", "Liliana Abril", "Diego Carpio", "Raul Cardenas"
     ]
 )
 
