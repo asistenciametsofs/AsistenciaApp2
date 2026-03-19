@@ -301,7 +301,11 @@ if enviar:
         part.set_payload(f.read())
 
     encoders.encode_base64(part)
-    part.add_header("Content-Disposition", 'attachment; filename="Alcohotest.pdf"')
+    nombre_archivo = f"{fecha}_{supervisor}_Alcohotest.pdf"
+    part.add_header(
+    "Content-Disposition",
+    f'attachment; filename="{nombre_archivo}"'
+    )
     msg.attach(part)
 
     server = smtplib.SMTP("smtp.gmail.com", 587)
